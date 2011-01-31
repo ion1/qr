@@ -105,7 +105,7 @@ if ! cmp "$infile" "$verifyfile"; then
 fi
 
 case "$finaloutfile" in
-''|'-')
+-)
   cat "$outfile" ;;
 *)
   cp "$outfile" -- "$finaloutfile" ;;
