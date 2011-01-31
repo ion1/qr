@@ -1,0 +1,13 @@
+qr – Convert text files to QR code
+
+USAGE: ./qr [OPTION]... [--] [-|INFILE [-|OUTFILE]]
+
+Options:
+  -h, --help  Display this help
+
+qr will read text from INFILE, convert it into QR code, verify the output and
+and write the output (a PNG image) into OUTFILE.
+
+Bug: zbarimg seems to handle raw 8-bit input as Shift-JIS, making the
+verification fail for non-ASCII text.
+
