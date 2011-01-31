@@ -66,6 +66,18 @@ if [ "$#" -gt 0 ]; then
   exit 1
 fi
 
+need_cmd() {
+  if ! which "$1" >/dev/null; then
+    >&2 printf 'Command %s not found\n' "$1"
+    exit 1
+  fi
+}
+
+need_cmd montage
+need_cmd qrencode
+need_cmd truncate
+need_cmd zbarimg
+
 dir="$(mktemp -d --tmpdir qr.XXXXXXXXXX)"
 trap 'rm -fr "$dir"' 0 1 2 13 15
 
