@@ -1,0 +1,114 @@
+#!/bin/sh
+
+# qr – Convert text files to QR code
+#
+# Copyright © 2011 Johan Kiviniemi <devel@johan.kiviniemi.name>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+set -eu
+
+usage() {
+  cat <<E
+qr – Convert text files to QR code
+
+USAGE: $0 [OPTION]... [--] [-|INFILE [-|OUTFILE]]
+
+Options:
+  -h, --help  Display this help
+
+qr will read text from INFILE, convert it into QR code, verify the output and
+and write the output (a PNG image) into OUTFILE.
+
+Bug: zbarimg seems to handle raw 8-bit input as Shift-JIS, making the
+verification fail for non-ASCII text.
+
+E
+}
+
+getopt=getopt
+if which gnugetopt >/dev/null 2>&1; then
+  getopt=gnugetopt
+fi
+
+opts="$("$getopt" -s sh -o h -l help -- "$@")"
+eval set -- "$opts"
+
+while true; do
+  case "$1" in
+  -h|--help)
+    shift; usage; exit 0 ;;
+  --)
+    shift; break ;;
+  *)
+    >&2 printf '%s: The dungeon collapsed\n' "$0"; exit 1 ;;
+  esac
+done
+
+initinfile='-'
+if [ "$#" -gt 0 ]; then initinfile="$1"; shift; fi
+
+finaloutfile='-'
+if [ "$#" -gt 0 ]; then finaloutfile="$1"; shift; fi
+
+if [ "$#" -gt 0 ]; then
+  >&2 usage
+  exit 1
+fi
+
+dir="$(mktemp -d --tmpdir qr.XXXXXXXXXX)"
+trap 'rm -fr "$dir"' 0 1 2 13 15
+
+>&2 printf 'Copying input\n'
+
+infile="$dir"/input
+cat -- "$initinfile" >"$infile"
+
+qrdir="$dir"/qr
+mkdir "$qrdir"
+
+>&2 printf 'Encoding\n'
+
+# zbarimg doesn’t seem to understand symversion=40
+cat -- "$infile" | \
+qrencode --output="$qrdir"/qr.png \
+  --level=H --structured --symversion=39 \
+  --8bit
+
+>&2 printf 'Combining images\n'
+
+outfile="$dir"/out.png
+montage -geometry '+0+0' "$qrdir"/qr-*.png "$outfile"
+
+>&2 printf 'Verifying the result\n'
+
+verifyfile="$dir"/input.verify
+zbarimg --raw "$outfile" >"$verifyfile"
+
+# zbarimg adds an extra linefeed.
+truncate --size=-1 "$verifyfile"
+
+if ! cmp "$infile" "$verifyfile"; then
+  >&2 printf 'Output did not match input!\n'
+  diff -u "$infile" "$verifyfile"
+  exit 1
+fi
+
+case "$finaloutfile" in
+''|'-')
+  cat "$outfile" ;;
+*)
+  cp "$outfile" -- "$finaloutfile" ;;
+esac
+
+# vim:set et sw=2 sts=2:
